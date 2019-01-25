@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#simplebuild_plugin osemu
+
+osemu_logo(){ clear;echo -en "$w_l";
+echo "________    ____________________"
+echo "\_____  \  /   _____/\_   _____/ _____  __ __"
+echo " /   |   \ \_____  \  |    __)_ /     \|  |  \ "
+echo "/    |    \/        \ |        \  Y Y  \  |  /"
+echo "\_______  /_______  //_______  /__|_|  /____/"
+echo "        \/        \/         \/      \/"
+};
+osemu(){
+clear;
+if [ ! -n "$1" ];then
+    _toolchainname="native";
+else
+	_toolchainname="$1";
+	if [ ! -d "$tcdir/$_toolchainname" ];then clear;slogo;
+		for t in "${AVAI_TCLIST[@]}";do
+			_tmp="$1";[ "$t" == "$1" ] && _load_toolchain "$1" && break;
+		done;
+		_console_extract_toolchain 2>&1 /dev/null;
+		if [ -f "$tc_dl" ];then
+			echo -e "$p_l\n\n  toolchain for $_tmp loaded\n";
+		else
+			_nl;clear;slogo;
+			echo -e "$r_l  toolchain missing/error\n";
+		fi;
+	fi
+fi;
+source "$tccfgdir/$_toolchainname";
+
+zipurl="https://codeload.github.com/oscam-emu/OSEmu/zip/master";
+versionurl="https://raw.githubusercontent.com/oscam-emu/OSEmu/master/VERSION";
+
+cd "$dldir";
+[ -f master.zip ] && rm -rf master.zip;
+echo -en "$w_l";
+osemu_logo;
+OSEMUVERSION=$(wget -qO- $versionurl |grep 'Version' |awk '{print $2}');
+echo -e "$g_l     -=[ Micro Opensource Emulator ]=-\n\n$w_l   Version: $OSEMUVERSION\n$y_l""  download: ";
+wget -N --progress=dot -Omaster.zip "$zipurl" 2>&1 |grep --line-buffered "%" |awk '{ printf "\033[10;13H\033[K%-4s ", $7;} { printf "'"$txt_wait >"'"; } { printf " %-6s",$9; }';echo -e "\033[10;13H\033[K100% done...                    ";
+if [ -f master.zip ];
+then
+	[ -d "$workdir/OSEmu-master" ] && rm -rf "$workdir/OSEmu-master";
+	echo -e "$p_l  $txt_extracting"": source $txt_to $workdir/OSEmu-master";
+	unzip -q master.zip -d "$workdir";
+else	
+	echo "  master.zip $txt_not_found";exit;
+fi;
+cd "$workdir/OSEmu-master";
+chmod 755 pre-commit;
+./pre-commit;
+echo -en "$w_l\n";
+gc="$tcdir/$_toolchainname/bin/$_compiler""gcc";
+st="$tcdir/$_toolchainname/bin/$_compiler""strip";
+sed "s#?= gcc#:= $gc#g" Makefile >Makefile-$_toolchainname;
+sed "s#?= strip#:= $st#g" Makefile-$_toolchainname >Makefile;
+make -j$(nproc)|sed -e "s/^CC\|^BUILD/$G BUILD >$W/g;s/^touch/$C TOUCH >$W/g;";
+if [ -f OSEmu ];then
+	echo -e "$y_l""OSEmu $txt_to $bindir/OSEmu.$_toolchainname.$OSEMUVERSION $txt_save$w_l\n"
+	mv OSEmu "$bdir/OSEmu.$_toolchainname.$OSEMUVERSION";
+fi
+cd "$workdir";
+rm -rf "$workdir/OSEmu-master";
+};
+
